@@ -135,7 +135,7 @@ elif pagina == "Overzicht":
 # ─────────────────────────────
 elif pagina == "Weekoverzicht":
     st.title("🗓️ Weekoverzicht")
-
+    st.write("Dubbelklik op een vakje om alle info te zien.")
     if len(selected_vakken) < 1:
         st.warning("Selecteer minimaal één vak.")
         st.stop()
