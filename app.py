@@ -1,9 +1,5 @@
 import streamlit as st
-from utils import (
-    read_first_table,
-    merge_studiewijzers_by_week,
-    get_week_details
-)
+from utils import *
 from db import (
     init_db,
     save_studiewijzer,
@@ -118,7 +114,7 @@ elif pagina == "Bewerken":
             )
             if rows_to_remove:
                 edited_df = edited_df.drop(index=rows_to_remove)
-                
+
         if st.button("💾 Opslaan"):
             save_studiewijzer(vak, edited_df)
             st.success("Wijzigingen opgeslagen")
