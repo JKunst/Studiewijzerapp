@@ -1,2 +1,4 @@
 python-docx
 pandas
+openpyxl
+streamlit

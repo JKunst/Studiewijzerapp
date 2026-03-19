@@ -1,3 +1,4 @@
+import io
 import streamlit as st
 from utils import *
 from db import (
@@ -17,7 +18,7 @@ studiewijzers = load_all_studiewijzers()
 
 pagina = st.sidebar.radio(
     "Navigatie",
-    ["Upload", "Bewerken", "Overzicht", "Weekoverzicht", "Weekdetail", "Beheer"]
+    ["Upload", "Bewerken", "Overzicht", "Weekoverzicht", "Weekdetail", "Beheer", "Exporteren"]
 )
 
 # ─────────────────────────────
@@ -190,3 +191,91 @@ elif pagina == "Beheer":
             delete_studiewijzer(vak)
             st.success(f"{vak} verwijderd")
             st.rerun()
+
+# ─────────────────────────────
+# PAGINA – EXPORTEREN
+# ─────────────────────────────
+elif pagina == "Exporteren":
+    st.title("📊 Exporteren naar Excel")
+
+    if not studiewijzers:
+        st.info("Geen studiewijzers om te exporteren.")
+    else:
+        st.markdown("Exporteer alle vakken naar één Excel-bestand. Elk vak krijgt een eigen tabblad.")
+
+        vakken_export = st.multiselect(
+            "Vakken om te exporteren",
+            options=list(studiewijzers.keys()),
+            default=list(studiewijzers.keys())
+        )
+
+        if vakken_export:
+            with st.expander("🔍 Preview data", expanded=False):
+                for vak in vakken_export:
+                    st.markdown(f"**{vak}**")
+                    st.dataframe(studiewijzers[vak], use_container_width=True)
+
+            def generate_excel(vakken):
+                import io, re
+                import pandas as pd
+                from openpyxl.styles import Alignment, PatternFill, Font, Border, Side
+
+                output = io.BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    for vak in vakken:
+                        df = studiewijzers[vak].copy()
+
+                        # Schoon kolomsuffixen op (_0, _1, etc.)
+                        df.columns = [
+                            re.sub(r"_\d+$", "", col) if re.search(r"_\d+$", col) else col
+                            for col in df.columns
+                        ]
+
+                        sheet_name = vak[:31]
+                        df.to_excel(writer, sheet_name=sheet_name, index=False)
+
+                        ws = writer.sheets[sheet_name]
+
+                        # Kolombreedtes
+                        for col_idx, col_name in enumerate(df.columns, start=1):
+                            col_values = list(df[col_name].astype(str)) + [str(col_name)]
+                            max_width = max(
+                                max(len(line) for line in val.split("\n"))
+                                for val in col_values
+                            )
+                            col_letter = ws.cell(row=1, column=col_idx).column_letter
+                            ws.column_dimensions[col_letter].width = max(12, min(max_width + 4, 60))
+
+                        # Opmaak
+                        header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+                        header_font = Font(color="FFFFFF", bold=True, size=11)
+                        alt_fill   = PatternFill(start_color="D6E4F0", end_color="D6E4F0", fill_type="solid")
+                        side       = Side(style="thin", color="BFBFBF")
+                        border     = Border(left=side, right=side, top=side, bottom=side)
+
+                        for row_idx, row in enumerate(ws.iter_rows(), start=1):
+                            for cell in row:
+                                cell.border = border
+                                cell.alignment = Alignment(wrap_text=True, vertical="top")
+                                if row_idx == 1:
+                                    cell.fill = header_fill
+                                    cell.font = header_font
+                                elif row_idx % 2 == 0:
+                                    cell.fill = alt_fill
+
+                        ws.freeze_panes = "A2"
+
+                output.seek(0)
+                return output.getvalue()
+
+            excel_bytes = generate_excel(vakken_export)
+
+            st.download_button(
+                label="⬇️ Download Excel",
+                data=excel_bytes,
+                file_name="studiewijzers.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary"
+            )
+
+            st.caption(f"📋 {len(vakken_export)} vak(ken) geselecteerd • één tabblad per vak")
